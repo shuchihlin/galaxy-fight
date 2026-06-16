@@ -1,20 +1,24 @@
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, COLORS, PLAYER } from './config.js';
+import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, COLORS } from './config.js';
 import { Starfield } from './starfield.js';
 import { input } from './core/input.js';
+import { Player } from './entities/player.js';
 
-// Top-level game object. For Phase 0 this is a simple two-state machine
-// (title -> playing) that proves the loop, input, and rendering pipeline
-// all work end to end. Later phases hang enemies, bullets, etc. off here.
+// Top-level game object. State machine: title -> playing. Enemies and
+// collisions arrive in Phases 2-3 and hang off the playing state here.
 export class Game {
   constructor(ctx) {
     this.ctx = ctx;
     this.starfield = new Starfield();
     this.state = 'title';
     this.elapsed = 0;
-    this.player = {
-      x: VIRTUAL_WIDTH / 2,
-      y: VIRTUAL_HEIGHT - 28,
-    };
+    this.reset();
+  }
+
+  reset() {
+    this.player = new Player();
+    this.bullets = [];
+    this.score = 0;
+    this.lives = 3;
   }
 
   update(dt) {
@@ -23,14 +27,13 @@ export class Game {
 
     if (this.state === 'title') {
       if (input.wasPressed('start') || input.wasPressed('fire')) {
+        this.reset();
         this.state = 'playing';
       }
     } else if (this.state === 'playing') {
-      const p = this.player;
-      if (input.isDown('left')) p.x -= PLAYER.speed * dt;
-      if (input.isDown('right')) p.x += PLAYER.speed * dt;
-      const half = PLAYER.width / 2;
-      p.x = Math.max(half, Math.min(VIRTUAL_WIDTH - half, p.x));
+      this.player.update(dt, this.bullets);
+      for (const b of this.bullets) b.update(dt);
+      this.bullets = this.bullets.filter((b) => !b.dead);
     }
 
     input.clearFrame();
@@ -55,7 +58,6 @@ export class Game {
     ctx.fillStyle = COLORS.accent;
     ctx.fillText('FIGHT', VIRTUAL_WIDTH / 2, 132);
 
-    // Blinking prompt.
     if (Math.floor(this.elapsed * 2) % 2 === 0) {
       ctx.fillStyle = COLORS.white;
       ctx.font = '8px "Press Start 2P", monospace';
@@ -64,28 +66,23 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 0 - SCAFFOLD', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('PHASE 1 - PLAYER', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {
-    this.drawShip(ctx, this.player.x, this.player.y);
-
-    ctx.fillStyle = COLORS.dim;
-    ctx.font = '6px "Press Start 2P", monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('MOVE: < >', 6, 12);
+    for (const b of this.bullets) b.render(ctx);
+    this.player.render(ctx);
+    this.renderHud(ctx);
   }
 
-  // Placeholder triangle ship — real pixel-art sprite arrives in Phase 1.
-  drawShip(ctx, x, y) {
-    const w = PLAYER.width;
-    const h = PLAYER.height;
-    ctx.fillStyle = COLORS.player;
-    ctx.beginPath();
-    ctx.moveTo(x, y - h / 2);
-    ctx.lineTo(x - w / 2, y + h / 2);
-    ctx.lineTo(x + w / 2, y + h / 2);
-    ctx.closePath();
-    ctx.fill();
+  renderHud(ctx) {
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '6px "Press Start 2P", monospace';
+
+    ctx.textAlign = 'left';
+    ctx.fillText('SCORE ' + String(this.score).padStart(5, '0'), 4, 10);
+
+    ctx.textAlign = 'right';
+    ctx.fillText('LIVES ' + this.lives, VIRTUAL_WIDTH - 4, 10);
   }
 }
