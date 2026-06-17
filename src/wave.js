@@ -20,12 +20,16 @@ function typeFor(row, col) {
 }
 
 export class Wave {
-  constructor(formation) {
+  constructor(formation, difficulty = {}) {
     this.formation = formation;
+    this.difficulty = difficulty;
+    this.diveInterval = difficulty.diveInterval ?? DIVE_INTERVAL;
+    this.maxDivers = difficulty.maxDivers ?? MAX_DIVERS;
+    this.captureInterval = difficulty.captureInterval ?? CAPTURE_INTERVAL;
     this.enemies = [];
     this.queue = [];
     this.timer = 0;
-    this.diveTimer = DIVE_INTERVAL;
+    this.diveTimer = this.diveInterval;
     this.captureTimer = CAPTURE_FIRST;
     this.buildSchedule();
   }
@@ -54,7 +58,7 @@ export class Wave {
     this.formation.update(dt);
 
     while (this.queue.length && this.queue[0].releaseAt <= this.timer) {
-      this.enemies.push(new Enemy(this.queue.shift(), this.formation));
+      this.enemies.push(new Enemy(this.queue.shift(), this.formation, this.difficulty));
     }
 
     for (const e of this.enemies) e.update(dt, player, enemyBullets);
@@ -66,10 +70,10 @@ export class Wave {
       const divers = this.enemies.filter(
         (e) => e.state === 'diving' || e.state === 'returning'
       );
-      if (formed.length > 0 && divers.length < MAX_DIVERS) {
+      if (formed.length > 0 && divers.length < this.maxDivers) {
         formed[Math.floor(Math.random() * formed.length)].startDive(player);
       }
-      this.diveTimer = DIVE_INTERVAL;
+      this.diveTimer = this.diveInterval;
     }
 
     // Periodically send a boss to attempt a tractor-beam capture.
@@ -82,7 +86,7 @@ export class Wave {
       if (bosses.length > 0) {
         bosses[Math.floor(Math.random() * bosses.length)].startCapture();
       }
-      this.captureTimer = CAPTURE_INTERVAL;
+      this.captureTimer = this.captureInterval;
     }
   }
 

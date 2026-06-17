@@ -30,8 +30,9 @@ const RIGHT_ENTRY = [
 ];
 
 const ENTRY_SPEED = 100; // px/sec along entry/return paths
-const DIVE_SPEED = 155; // px/sec along a dive attack
+const DIVE_SPEED = 155; // px/sec along a dive attack (default; scales by stage)
 const DIVE_FIRE_INTERVAL = 0.6;
+const FLYTHROUGH_SPEED = 115; // px/sec during challenging-stage patterns
 
 // Capture (tractor-beam) tuning.
 const HOVER_Y = 150; // where the boss hovers to deploy the beam
@@ -40,9 +41,9 @@ const BEAM_GROW = 0.4; // seconds to open / close the beam
 const BEAM_HOLD = 2.6; // seconds the beam stays open if it catches nothing
 
 export class Enemy {
-  constructor(slot, formation) {
-    this.row = slot.row;
-    this.col = slot.col;
+  constructor(slot, formation, difficulty = {}) {
+    this.row = slot.row ?? 0;
+    this.col = slot.col ?? 0;
     this.type = slot.type;
     this.formation = formation;
 
@@ -62,23 +63,32 @@ export class Enemy {
     this.height = this.sprite.height;
     this.dead = false;
     this.damaged = false;
+    this.exited = false;
     this.fireTimer = 0;
+    this.diveSpeed = difficulty.diveSpeed ?? DIVE_SPEED;
+    this.fireInterval = difficulty.fireInterval ?? DIVE_FIRE_INTERVAL;
 
     // Capture state.
     this.hasCaptive = false;
     this.capturePhase = null;
     this.beamT = 0;
     this.holdTimer = 0;
-
-    const common = slot.side === 'left' ? LEFT_ENTRY : RIGHT_ENTRY;
-    const home = formation.slotHome(this.row, this.col);
-    this.path = new Path([...common, home]);
     this.dist = 0;
 
-    this.state = 'entering';
-    const start = this.path.at(0);
-    this.x = start.x;
-    this.y = start.y;
+    if (formation) {
+      const common = slot.side === 'left' ? LEFT_ENTRY : RIGHT_ENTRY;
+      const home = formation.slotHome(this.row, this.col);
+      this.path = new Path([...common, home]);
+      this.state = 'entering';
+      const start = this.path.at(0);
+      this.x = start.x;
+      this.y = start.y;
+    } else {
+      // Challenging-stage enemy: set up with startFlythrough().
+      this.state = 'idle';
+      this.x = slot.x ?? 0;
+      this.y = slot.y ?? -20;
+    }
   }
 
   // Break out of formation and swoop down toward the player, then off the
@@ -120,6 +130,16 @@ export class Enemy {
   // Called by the game once the player has been fully pulled in.
   captureDone() {
     this.capturePhase = 'retract';
+  }
+
+  // Challenging-stage movement: fly a pattern across the screen and exit.
+  startFlythrough(path) {
+    this.state = 'flythrough';
+    this.path = path;
+    this.dist = 0;
+    const start = path.at(0);
+    this.x = start.x;
+    this.y = start.y;
   }
 
   // After diving off-screen, re-enter from the top and fly back to slot.
@@ -172,7 +192,7 @@ export class Enemy {
       this.x += (target.x - this.x) * k;
       this.y += (target.y - this.y) * k;
     } else if (this.state === 'diving') {
-      this.dist += DIVE_SPEED * dt;
+      this.dist += this.diveSpeed * dt;
       const p = this.path.at(this.dist);
       this.x = p.x;
       this.y = p.y;
@@ -184,10 +204,16 @@ export class Enemy {
         const len = Math.hypot(dx, dy) || 1;
         const sp = 150;
         enemyBullets.push(new EnemyBullet(this.x, this.y, (dx / len) * sp, (dy / len) * sp));
-        this.fireTimer = DIVE_FIRE_INTERVAL;
+        this.fireTimer = this.fireInterval;
       }
 
       if (this.dist >= this.path.length) this.startReturn();
+    } else if (this.state === 'flythrough') {
+      this.dist += FLYTHROUGH_SPEED * dt;
+      const p = this.path.at(this.dist);
+      this.x = p.x;
+      this.y = p.y;
+      if (this.dist >= this.path.length) this.exited = true;
     }
   }
 

@@ -4,9 +4,16 @@ import { input } from './core/input.js';
 import { Player } from './entities/player.js';
 import { Formation } from './formation.js';
 import { Wave } from './wave.js';
+import { ChallengingWave } from './challenge.js';
+import { difficultyFor } from './difficulty.js';
 import { Explosion } from './entities/explosion.js';
 import { PLAYER_SPRITE } from './sprites.js';
 import { drawSprite } from './sprite.js';
+
+// A Challenging Stage every 4th stage (3, 7, 11, ...), as in the arcade.
+function isChallenging(stage) {
+  return stage % 4 === 3;
+}
 
 // Axis-aligned bounding-box overlap. Both args are { x, y, w, h } with
 // (x, y) the top-left corner.
@@ -35,11 +42,49 @@ export class Game {
     this.playerBullets = [];
     this.enemyBullets = [];
     this.explosions = [];
-    this.formation = new Formation();
-    this.wave = new Wave(this.formation);
+    this.formation = null;
+    this.wave = null;
     this.freed = null; // a rescued fighter descending to dock (dual fighter)
     this.score = 0;
     this.lives = 3;
+    this.stage = 1;
+    this.enterStageIntro();
+  }
+
+  // Show the "STAGE n" (or "CHALLENGING STAGE") banner before the wave.
+  enterStageIntro() {
+    this.phase = 'intro';
+    this.phaseTimer = 1.8;
+    this.challenge = isChallenging(this.stage);
+    this.wave = null;
+    this.playerBullets = [];
+    this.enemyBullets = [];
+    this.stageHits = 0;
+    this.stageTotal = 0;
+    this.lastBonus = 0;
+  }
+
+  beginWave() {
+    if (this.challenge) {
+      this.wave = new ChallengingWave();
+      this.stageTotal = this.wave.total;
+    } else {
+      this.formation = new Formation();
+      this.wave = new Wave(this.formation, difficultyFor(this.stage));
+    }
+    this.phase = 'fighting';
+  }
+
+  enterStageClear() {
+    this.phase = 'clear';
+    if (this.challenge) {
+      const perfect = this.stageTotal > 0 && this.stageHits === this.stageTotal;
+      this.lastBonus = this.stageHits * 100 + (perfect ? 10000 : 0);
+      this.score += this.lastBonus;
+      this.phaseTimer = 3.0;
+    } else {
+      this.phaseTimer = 1.4;
+    }
   }
 
   update(dt) {
@@ -63,8 +108,28 @@ export class Game {
   }
 
   updatePlaying(dt) {
+    if (this.phase === 'intro') {
+      this.phaseTimer -= dt;
+      this.player.update(dt, this.playerBullets);
+      if (this.phaseTimer <= 0) this.beginWave();
+      return;
+    }
+
+    if (this.phase === 'clear') {
+      this.phaseTimer -= dt;
+      this.player.update(dt, this.playerBullets);
+      for (const ex of this.explosions) ex.update(dt);
+      this.explosions = this.explosions.filter((e) => !e.done);
+      if (this.phaseTimer <= 0) {
+        this.stage += 1;
+        this.enterStageIntro();
+      }
+      return;
+    }
+
+    // phase === 'fighting'
     this.wave.update(dt, this.player, this.enemyBullets);
-    this.handleCapture();
+    if (!this.challenge) this.handleCapture();
     this.player.update(dt, this.playerBullets);
 
     for (const b of this.playerBullets) b.update(dt);
@@ -72,18 +137,13 @@ export class Game {
     for (const ex of this.explosions) ex.update(dt);
 
     this.handleCollisions();
-    this.updateRescue(dt);
+    if (!this.challenge) this.updateRescue(dt);
 
     this.playerBullets = this.playerBullets.filter((b) => !b.dead);
     this.enemyBullets = this.enemyBullets.filter((b) => !b.dead);
     this.explosions = this.explosions.filter((e) => !e.done);
 
-    // Endless for now — a fresh wave forms once the screen is cleared.
-    // Real stage progression (and bonus stages) arrives in Phase 6.
-    if (this.wave.cleared) {
-      this.formation = new Formation();
-      this.wave = new Wave(this.formation);
-    }
+    if (this.wave.cleared) this.enterStageClear();
   }
 
   handleCollisions() {
@@ -98,6 +158,7 @@ export class Game {
           if (destroyed) {
             this.score += e.points;
             this.explosions.push(new Explosion(e.x, e.y, explosionColor(e.type)));
+            if (this.challenge) this.stageHits += 1;
             // Destroying a boss that holds your ship frees it.
             if (e.hasCaptive && !this.player.dual) this.freed = { x: e.x, y: e.y };
           }
@@ -234,11 +295,11 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 5 - CAPTURE', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('PHASE 6 - STAGES', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {
-    this.wave.render(ctx);
+    if (this.wave) this.wave.render(ctx);
     for (const b of this.enemyBullets) b.render(ctx);
     for (const b of this.playerBullets) b.render(ctx);
     for (const ex of this.explosions) ex.render(ctx);
@@ -252,6 +313,39 @@ export class Game {
     }
     this.player.render(ctx);
     this.renderHud(ctx);
+
+    if (this.phase === 'intro') this.renderStageBanner(ctx);
+    else if (this.phase === 'clear') this.renderStageClear(ctx);
+  }
+
+  renderStageBanner(ctx) {
+    ctx.textAlign = 'center';
+    if (this.challenge) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.font = '11px "Press Start 2P", monospace';
+      ctx.fillText('CHALLENGING', VIRTUAL_WIDTH / 2, 134);
+      ctx.fillText('STAGE', VIRTUAL_WIDTH / 2, 152);
+    } else {
+      ctx.fillStyle = COLORS.player;
+      ctx.font = '14px "Press Start 2P", monospace';
+      ctx.fillText('STAGE ' + this.stage, VIRTUAL_WIDTH / 2, 144);
+    }
+  }
+
+  renderStageClear(ctx) {
+    if (!this.challenge) return; // normal stages just pause briefly
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd23f';
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.fillText('HITS ' + this.stageHits + '/' + this.stageTotal, VIRTUAL_WIDTH / 2, 132);
+
+    const perfect = this.stageTotal > 0 && this.stageHits === this.stageTotal;
+    ctx.fillStyle = COLORS.white;
+    ctx.fillText(
+      perfect ? 'PERFECT! 10000' : 'BONUS ' + this.stageHits * 100,
+      VIRTUAL_WIDTH / 2,
+      152
+    );
   }
 
   renderGameOver(ctx) {
@@ -276,5 +370,9 @@ export class Game {
 
     ctx.textAlign = 'right';
     ctx.fillText('LIVES ' + this.lives, VIRTUAL_WIDTH - 4, 10);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COLORS.dim;
+    ctx.fillText('ST ' + this.stage, VIRTUAL_WIDTH / 2, 10);
   }
 }
