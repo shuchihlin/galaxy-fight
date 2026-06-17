@@ -29,3 +29,46 @@ export const PLAYER_SPRITE = makeSprite(
   ],
   FIGHTER_PALETTE
 );
+
+// Bee (zako): blue body, yellow wing tips, cyan antennae.
+const BEE_PALETTE = {
+  B: '#3b6cff',
+  Y: '#ffd23f',
+  C: '#41d6ff',
+};
+
+export const BEE_SPRITE = makeSprite(
+  [
+    '..C.....C..',
+    '...C...C...',
+    '....BBB....',
+    '...BBBBB...',
+    '.YBBBBBBBY.',
+    'YYBBBBBBBYY',
+    '.Y.BBBBB.Y.',
+    '...B.B.B...',
+    '..B..B..B..',
+  ],
+  BEE_PALETTE
+);
+
+// Butterfly (goei): red wings, white body core.
+const BUTTERFLY_PALETTE = {
+  R: '#ff3b3b',
+  W: '#ffffff',
+};
+
+export const BUTTERFLY_SPRITE = makeSprite(
+  [
+    '.R.......R.',
+    '..RR...RR..',
+    '...WWWWW...',
+    '..WRRRRRW..',
+    '.RRRWWWRRR.',
+    'RRRRWWWRRRR',
+    '.RR.WWW.RR.',
+    '...R.W.R...',
+    '..R..R..R..',
+  ],
+  BUTTERFLY_PALETTE
+);
