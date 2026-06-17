@@ -12,6 +12,8 @@ import { drawSprite } from './sprite.js';
 import { audio } from './audio.js';
 import { loadScores, saveScore, highScore } from './highscores.js';
 
+const SPLASH_TIME = 2.0; // seconds the intro image shows before play
+
 // A Challenging Stage every 4th stage (3, 7, 11, ...), as in the arcade.
 function isChallenging(stage) {
   return stage % 4 === 3;
@@ -37,6 +39,12 @@ export class Game {
     this.state = 'title';
     this.elapsed = 0;
     this.highScores = loadScores();
+
+    // Intro splash (animated GIF) shown for SPLASH_TIME seconds after start.
+    // It's a DOM <img> overlay so the GIF animates natively.
+    this.splashEl = typeof document !== 'undefined' ? document.getElementById('splash') : null;
+    this.splashTimer = 0;
+
     this.reset();
   }
 
@@ -112,6 +120,14 @@ export class Game {
 
     if (this.state === 'title') {
       if (confirm) {
+        this.state = 'splash';
+        this.splashTimer = SPLASH_TIME;
+        this.showSplash(true);
+      }
+    } else if (this.state === 'splash') {
+      this.splashTimer -= dt;
+      if (this.splashTimer <= 0) {
+        this.showSplash(false);
         this.reset();
         this.state = 'playing';
         audio.startMusic();
@@ -296,10 +312,24 @@ export class Game {
 
     if (this.state === 'title') {
       this.renderTitle(ctx);
+    } else if (this.state === 'splash') {
+      // The animated GIF is a DOM overlay; the canvas just shows the
+      // starfield (already drawn above) behind it.
     } else {
       this.renderPlaying(ctx);
       if (this.state === 'gameover') this.renderGameOver(ctx);
       else if (this.paused) this.renderPaused(ctx);
+    }
+  }
+
+  // Show/hide the GIF overlay. Re-assigning src restarts it from frame 1.
+  showSplash(on) {
+    if (!this.splashEl) return;
+    if (on) {
+      this.splashEl.src = import.meta.env.BASE_URL + 'splash.gif';
+      this.splashEl.classList.add('show');
+    } else {
+      this.splashEl.classList.remove('show');
     }
   }
 
