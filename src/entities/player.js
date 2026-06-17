@@ -1,5 +1,5 @@
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, PLAYER } from '../config.js';
-import { input } from '../core/input.js';
+import { input, pointer } from '../core/input.js';
 import { drawSprite } from '../sprite.js';
 import { PLAYER_SPRITE } from '../sprites.js';
 import { Bullet } from './bullet.js';
@@ -53,13 +53,20 @@ export class Player {
 
     if (this.invuln > 0) this.invuln -= dt;
 
-    if (input.isDown('left')) this.x -= PLAYER.speed * dt;
-    if (input.isDown('right')) this.x += PLAYER.speed * dt;
+    const step = PLAYER.speed * dt;
+    if (input.isDown('left')) this.x -= step;
+    if (input.isDown('right')) this.x += step;
+    // Touch / mouse: glide toward the pointer's x.
+    if (pointer.active) {
+      const dx = pointer.x - this.x;
+      this.x += Math.abs(dx) <= step ? dx : Math.sign(dx) * step;
+    }
     const half = this.dual ? this.dualOffset + this.width / 2 : this.width / 2;
     this.x = Math.max(half, Math.min(VIRTUAL_WIDTH - half, this.x));
 
     if (this.cooldown > 0) this.cooldown -= dt;
-    if (input.isDown('fire') && this.cooldown <= 0) this.fire(bullets);
+    // Holding fire or touching the screen both shoot.
+    if ((input.isDown('fire') || pointer.active) && this.cooldown <= 0) this.fire(bullets);
   }
 
   // Being drawn up into the capturing boss: spin and drift toward it.

@@ -1,6 +1,6 @@
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, COLORS } from './config.js';
 import { Starfield } from './starfield.js';
-import { input } from './core/input.js';
+import { input, pointer } from './core/input.js';
 import { Player } from './entities/player.js';
 import { Formation } from './formation.js';
 import { Wave } from './wave.js';
@@ -10,6 +10,7 @@ import { Explosion } from './entities/explosion.js';
 import { PLAYER_SPRITE } from './sprites.js';
 import { drawSprite } from './sprite.js';
 import { audio } from './audio.js';
+import { loadScores, saveScore, highScore } from './highscores.js';
 
 // A Challenging Stage every 4th stage (3, 7, 11, ...), as in the arcade.
 function isChallenging(stage) {
@@ -35,6 +36,7 @@ export class Game {
     this.starfield = new Starfield();
     this.state = 'title';
     this.elapsed = 0;
+    this.highScores = loadScores();
     this.reset();
   }
 
@@ -49,6 +51,9 @@ export class Game {
     this.score = 0;
     this.lives = 3;
     this.stage = 1;
+    this.paused = false;
+    this.bestAtStart = highScore();
+    this.newRecord = false;
     this.enterStageIntro();
   }
 
@@ -80,6 +85,8 @@ export class Game {
   triggerGameOver() {
     this.player.alive = false;
     this.state = 'gameover';
+    this.newRecord = this.score > 0 && this.score > this.bestAtStart;
+    this.highScores = saveScore(this.score);
     audio.stopMusic();
     audio.gameOver();
   }
@@ -101,19 +108,21 @@ export class Game {
     this.starfield.update(dt);
 
     if (input.wasPressed('mute')) audio.toggleMute();
+    const confirm = input.wasPressed('start') || input.wasPressed('fire') || pointer.pressed;
 
     if (this.state === 'title') {
-      if (input.wasPressed('start') || input.wasPressed('fire')) {
+      if (confirm) {
         this.reset();
         this.state = 'playing';
         audio.startMusic();
       }
     } else if (this.state === 'playing') {
-      this.updatePlaying(dt);
+      if (input.wasPressed('pause')) this.paused = !this.paused;
+      if (!this.paused) this.updatePlaying(dt);
     } else if (this.state === 'gameover') {
       for (const ex of this.explosions) ex.update(dt);
       this.explosions = this.explosions.filter((e) => !e.done);
-      if (input.wasPressed('start')) this.state = 'title';
+      if (confirm) this.state = 'title';
     }
 
     input.clearFrame();
@@ -290,6 +299,7 @@ export class Game {
     } else {
       this.renderPlaying(ctx);
       if (this.state === 'gameover') this.renderGameOver(ctx);
+      else if (this.paused) this.renderPaused(ctx);
     }
   }
 
@@ -305,13 +315,38 @@ export class Game {
     if (Math.floor(this.elapsed * 2) % 2 === 0) {
       ctx.fillStyle = COLORS.white;
       ctx.font = '8px "Press Start 2P", monospace';
-      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 200);
+      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 168);
     }
+
+    // High-score table.
+    ctx.fillStyle = '#ffd23f';
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText('HIGH SCORES', VIRTUAL_WIDTH / 2, 192);
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '6px "Press Start 2P", monospace';
+    const scores = this.highScores.length ? this.highScores : [0];
+    scores.slice(0, 5).forEach((s, i) => {
+      ctx.fillText(
+        i + 1 + '   ' + String(s).padStart(6, '0'),
+        VIRTUAL_WIDTH / 2,
+        206 + i * 9
+      );
+    });
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('M = MUTE', VIRTUAL_WIDTH / 2, 224);
-    ctx.fillText('PHASE 7 - AUDIO', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('M MUTE   P PAUSE', VIRTUAL_WIDTH / 2, 264);
+    ctx.fillText('PHASE 8 - POLISH', VIRTUAL_WIDTH / 2, 278);
+  }
+
+  renderPaused(ctx) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '14px "Press Start 2P", monospace';
+    ctx.fillText('PAUSED', VIRTUAL_WIDTH / 2, 144);
+    ctx.fillStyle = COLORS.dim;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillText('P TO RESUME', VIRTUAL_WIDTH / 2, 164);
   }
 
   renderPlaying(ctx) {
@@ -368,33 +403,51 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.fillStyle = COLORS.accent;
     ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillText('GAME OVER', VIRTUAL_WIDTH / 2, 150);
+    ctx.fillText('GAME OVER', VIRTUAL_WIDTH / 2, 132);
+
+    ctx.fillStyle = COLORS.white;
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillText('SCORE ' + String(this.score).padStart(6, '0'), VIRTUAL_WIDTH / 2, 158);
+
+    if (this.newRecord) {
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText('NEW RECORD!', VIRTUAL_WIDTH / 2, 174);
+    } else {
+      ctx.fillStyle = COLORS.dim;
+      ctx.fillText('HI ' + String(highScore()).padStart(6, '0'), VIRTUAL_WIDTH / 2, 174);
+    }
 
     if (Math.floor(this.elapsed * 2) % 2 === 0) {
       ctx.fillStyle = COLORS.white;
       ctx.font = '7px "Press Start 2P", monospace';
-      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 178);
+      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 200);
     }
   }
 
   renderHud(ctx) {
+    const hi = Math.max(this.score, this.highScores[0] || 0);
+
     ctx.fillStyle = COLORS.white;
     ctx.font = '6px "Press Start 2P", monospace';
 
     ctx.textAlign = 'left';
     ctx.fillText('SCORE ' + String(this.score).padStart(5, '0'), 4, 10);
 
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('HI ' + String(hi).padStart(5, '0'), VIRTUAL_WIDTH / 2, 10);
+
     ctx.textAlign = 'right';
+    ctx.fillStyle = COLORS.white;
     ctx.fillText('LIVES ' + this.lives, VIRTUAL_WIDTH - 4, 10);
 
-    ctx.textAlign = 'center';
+    // Bottom corners: stage indicator + mute state.
     ctx.fillStyle = COLORS.dim;
-    ctx.fillText('ST ' + this.stage, VIRTUAL_WIDTH / 2, 10);
-
+    ctx.textAlign = 'left';
+    ctx.fillText('ST ' + this.stage, 4, VIRTUAL_HEIGHT - 4);
     if (audio.muted) {
-      ctx.textAlign = 'left';
-      ctx.fillStyle = COLORS.dim;
-      ctx.fillText('MUTE', 4, VIRTUAL_HEIGHT - 4);
+      ctx.textAlign = 'right';
+      ctx.fillText('MUTE', VIRTUAL_WIDTH - 4, VIRTUAL_HEIGHT - 4);
     }
   }
 }

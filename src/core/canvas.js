@@ -11,15 +11,13 @@ export function setupCanvas(canvas) {
   ctx.imageSmoothingEnabled = false;
 
   function resize() {
-    const scale = Math.max(
-      1,
-      Math.floor(
-        Math.min(
-          window.innerWidth / VIRTUAL_WIDTH,
-          window.innerHeight / VIRTUAL_HEIGHT
-        )
-      )
+    const raw = Math.min(
+      window.innerWidth / VIRTUAL_WIDTH,
+      window.innerHeight / VIRTUAL_HEIGHT
     );
+    // Whole-number scaling keeps pixels crisp when there's room; on small
+    // screens (raw < 1) fall back to fractional so it still fits.
+    const scale = raw >= 1 ? Math.floor(raw) : raw;
     canvas.style.width = `${VIRTUAL_WIDTH * scale}px`;
     canvas.style.height = `${VIRTUAL_HEIGHT * scale}px`;
   }

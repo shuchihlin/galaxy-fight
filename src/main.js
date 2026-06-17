@@ -1,6 +1,6 @@
 import './style.css';
 import { setupCanvas } from './core/canvas.js';
-import { setupInput } from './core/input.js';
+import { setupInput, setupPointer } from './core/input.js';
 import { startLoop } from './core/loop.js';
 import { Game } from './game.js';
 import { audio } from './audio.js';
@@ -8,6 +8,7 @@ import { audio } from './audio.js';
 const canvas = document.getElementById('game');
 const ctx = setupCanvas(canvas);
 setupInput();
+setupPointer(canvas);
 
 // Browsers require a user gesture before audio can start.
 function unlockAudio() {

@@ -29,4 +29,6 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
+  /* Stop the browser hijacking touch gestures (scroll/zoom) on the canvas. */
+  touch-action: none;
 }
