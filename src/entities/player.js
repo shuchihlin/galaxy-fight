@@ -13,8 +13,9 @@ export class Player {
   constructor() {
     this.width = PLAYER_SPRITE.width;
     this.height = PLAYER_SPRITE.height;
+    this.baseY = VIRTUAL_HEIGHT - 22; // the ship's home line at the bottom
     this.x = VIRTUAL_WIDTH / 2;
-    this.y = VIRTUAL_HEIGHT - 22;
+    this.y = this.baseY;
     this.cooldown = 0;
     this.alive = true;
     this.invuln = 0;
@@ -47,6 +48,7 @@ export class Player {
         this.alive = true;
         this.invuln = RESPAWN_INVULN;
         this.x = VIRTUAL_WIDTH / 2;
+        this.y = this.baseY;
       }
       return;
     }
