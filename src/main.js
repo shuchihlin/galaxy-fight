@@ -10,6 +10,9 @@ setupInput();
 
 const game = new Game(ctx);
 
+// Dev-only handle for debugging in the console (stripped from production builds).
+if (import.meta.env.DEV) window.game = game;
+
 startLoop({
   update: (dt) => game.update(dt),
   render: () => game.render(),

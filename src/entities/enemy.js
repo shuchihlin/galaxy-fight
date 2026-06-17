@@ -1,8 +1,14 @@
 import { Path } from '../path.js';
 import { drawSprite } from '../sprite.js';
-import { BEE_SPRITE, BUTTERFLY_SPRITE, BOSS_SPRITE, BOSS_HIT_SPRITE } from '../sprites.js';
+import {
+  BEE_SPRITE,
+  BUTTERFLY_SPRITE,
+  BOSS_SPRITE,
+  BOSS_HIT_SPRITE,
+  PLAYER_SPRITE,
+} from '../sprites.js';
 import { EnemyBullet } from './bullet.js';
-import { VIRTUAL_WIDTH } from '../config.js';
+import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from '../config.js';
 
 // Shared entry flight paths (in virtual-screen coords). Enemies enter
 // from the top corners, swoop down to mid-screen, loop, then peel off
@@ -26,6 +32,12 @@ const RIGHT_ENTRY = [
 const ENTRY_SPEED = 100; // px/sec along entry/return paths
 const DIVE_SPEED = 155; // px/sec along a dive attack
 const DIVE_FIRE_INTERVAL = 0.6;
+
+// Capture (tractor-beam) tuning.
+const HOVER_Y = 150; // where the boss hovers to deploy the beam
+const BEAM_MAX_HALF = 26; // beam half-width at the bottom of the screen
+const BEAM_GROW = 0.4; // seconds to open / close the beam
+const BEAM_HOLD = 2.6; // seconds the beam stays open if it catches nothing
 
 export class Enemy {
   constructor(slot, formation) {
@@ -51,6 +63,12 @@ export class Enemy {
     this.dead = false;
     this.damaged = false;
     this.fireTimer = 0;
+
+    // Capture state.
+    this.hasCaptive = false;
+    this.capturePhase = null;
+    this.beamT = 0;
+    this.holdTimer = 0;
 
     const common = slot.side === 'left' ? LEFT_ENTRY : RIGHT_ENTRY;
     const home = formation.slotHome(this.row, this.col);
@@ -82,6 +100,28 @@ export class Enemy {
     this.fireTimer = 0.45;
   }
 
+  // A boss-only attack: dive to a hover point and deploy a tractor beam.
+  startCapture() {
+    this.state = 'capturing';
+    this.capturePhase = 'dive';
+    const sx = this.x;
+    const sy = this.y;
+    const dir = sx < VIRTUAL_WIDTH / 2 ? 1 : -1;
+    this.path = new Path([
+      { x: sx, y: sy },
+      { x: sx + dir * 24, y: sy + 50 },
+      { x: VIRTUAL_WIDTH / 2, y: HOVER_Y },
+    ]);
+    this.dist = 0;
+    this.beamT = 0;
+    this.holdTimer = 0;
+  }
+
+  // Called by the game once the player has been fully pulled in.
+  captureDone() {
+    this.capturePhase = 'retract';
+  }
+
   // After diving off-screen, re-enter from the top and fly back to slot.
   startReturn() {
     this.state = 'returning';
@@ -95,7 +135,31 @@ export class Enemy {
     this.y = -18;
   }
 
+  get beamActive() {
+    return (
+      (this.capturePhase === 'beam' || this.capturePhase === 'holding') && this.beamT > 0.4
+    );
+  }
+
+  beamHalfWidthAt(y) {
+    const apexY = this.y + this.height / 2;
+    if (y < apexY || y > VIRTUAL_HEIGHT) return 0;
+    const frac = (y - apexY) / (VIRTUAL_HEIGHT - apexY);
+    return BEAM_MAX_HALF * frac;
+  }
+
+  beamContains(px, py) {
+    if (!this.beamActive) return false;
+    const half = this.beamHalfWidthAt(py);
+    return half > 0 && Math.abs(px - this.x) <= half;
+  }
+
   update(dt, player, enemyBullets) {
+    if (this.state === 'capturing') {
+      this.updateCapture(dt);
+      return;
+    }
+
     if (this.state === 'entering' || this.state === 'returning') {
       this.dist += ENTRY_SPEED * dt;
       const p = this.path.at(this.dist);
@@ -127,6 +191,32 @@ export class Enemy {
     }
   }
 
+  updateCapture(dt) {
+    if (this.capturePhase === 'dive') {
+      this.dist += DIVE_SPEED * dt;
+      const p = this.path.at(this.dist);
+      this.x = p.x;
+      this.y = p.y;
+      if (this.dist >= this.path.length) {
+        this.capturePhase = 'beam';
+        this.beamT = 0;
+        this.holdTimer = 0;
+      }
+    } else if (this.capturePhase === 'beam') {
+      this.beamT = Math.min(1, this.beamT + dt / BEAM_GROW);
+      this.holdTimer += dt;
+      if (this.holdTimer > BEAM_HOLD) this.capturePhase = 'retract';
+    } else if (this.capturePhase === 'holding') {
+      this.beamT = 1; // hold until the game finishes pulling the player in
+    } else if (this.capturePhase === 'retract') {
+      this.beamT = Math.max(0, this.beamT - dt / BEAM_GROW);
+      if (this.beamT <= 0) {
+        this.capturePhase = null;
+        this.startReturn();
+      }
+    }
+  }
+
   // Apply one hit. Returns true if this destroyed the enemy, false if it
   // only wounded it (a Boss Galaga survives its first hit and flashes).
   hit() {
@@ -152,6 +242,8 @@ export class Enemy {
   }
 
   render(ctx) {
+    if (this.beamT > 0.01 && this.capturePhase) this.renderBeam(ctx);
+
     const sprite = this.damaged && this.hitSprite ? this.hitSprite : this.sprite;
     drawSprite(
       ctx,
@@ -159,5 +251,44 @@ export class Enemy {
       Math.round(this.x - this.width / 2),
       Math.round(this.y - this.height / 2)
     );
+
+    // A captured fighter rides just below the boss that holds it.
+    if (this.hasCaptive) {
+      drawSprite(
+        ctx,
+        PLAYER_SPRITE,
+        Math.round(this.x - PLAYER_SPRITE.width / 2),
+        Math.round(this.y + this.height / 2 + 1)
+      );
+    }
+  }
+
+  renderBeam(ctx) {
+    const apexY = this.y + this.height / 2;
+    const span = VIRTUAL_HEIGHT - apexY;
+    const half = BEAM_MAX_HALF * this.beamT;
+
+    ctx.save();
+    // Soft purple cone.
+    ctx.globalAlpha = 0.22 * this.beamT;
+    ctx.fillStyle = '#7a4dff';
+    ctx.beginPath();
+    ctx.moveTo(this.x, apexY);
+    ctx.lineTo(this.x - half, VIRTUAL_HEIGHT);
+    ctx.lineTo(this.x + half, VIRTUAL_HEIGHT);
+    ctx.closePath();
+    ctx.fill();
+
+    // Animated bands sliding down the beam.
+    ctx.globalAlpha = 0.5 * this.beamT;
+    ctx.fillStyle = '#b39dff';
+    const t = (performance.now() / 320) % 1;
+    for (let i = 0; i < 5; i++) {
+      const f = (i / 5 + t) % 1;
+      const by = apexY + f * span;
+      const bw = half * f;
+      ctx.fillRect(this.x - bw, by, bw * 2, 2);
+    }
+    ctx.restore();
   }
 }

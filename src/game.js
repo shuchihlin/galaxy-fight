@@ -5,6 +5,8 @@ import { Player } from './entities/player.js';
 import { Formation } from './formation.js';
 import { Wave } from './wave.js';
 import { Explosion } from './entities/explosion.js';
+import { PLAYER_SPRITE } from './sprites.js';
+import { drawSprite } from './sprite.js';
 
 // Axis-aligned bounding-box overlap. Both args are { x, y, w, h } with
 // (x, y) the top-left corner.
@@ -35,6 +37,7 @@ export class Game {
     this.explosions = [];
     this.formation = new Formation();
     this.wave = new Wave(this.formation);
+    this.freed = null; // a rescued fighter descending to dock (dual fighter)
     this.score = 0;
     this.lives = 3;
   }
@@ -61,6 +64,7 @@ export class Game {
 
   updatePlaying(dt) {
     this.wave.update(dt, this.player, this.enemyBullets);
+    this.handleCapture();
     this.player.update(dt, this.playerBullets);
 
     for (const b of this.playerBullets) b.update(dt);
@@ -68,6 +72,7 @@ export class Game {
     for (const ex of this.explosions) ex.update(dt);
 
     this.handleCollisions();
+    this.updateRescue(dt);
 
     this.playerBullets = this.playerBullets.filter((b) => !b.dead);
     this.enemyBullets = this.enemyBullets.filter((b) => !b.dead);
@@ -93,13 +98,15 @@ export class Game {
           if (destroyed) {
             this.score += e.points;
             this.explosions.push(new Explosion(e.x, e.y, explosionColor(e.type)));
+            // Destroying a boss that holds your ship frees it.
+            if (e.hasCaptive && !this.player.dual) this.freed = { x: e.x, y: e.y };
           }
           break;
         }
       }
     }
 
-    const vulnerable = this.player.alive && this.player.invuln <= 0;
+    const vulnerable = this.player.alive && this.player.invuln <= 0 && !this.player.captured;
 
     // Enemy shots vs player.
     if (vulnerable) {
@@ -130,6 +137,16 @@ export class Game {
   }
 
   killPlayer() {
+    // A dual fighter loses one ship and reverts to single — no life lost.
+    if (this.player.dual) {
+      this.player.dual = false;
+      this.player.invuln = 1.2;
+      this.explosions.push(
+        new Explosion(this.player.x + this.player.dualOffset, this.player.y, COLORS.player)
+      );
+      return;
+    }
+
     this.explosions.push(new Explosion(this.player.x, this.player.y, COLORS.player));
     this.lives -= 1;
     if (this.lives <= 0) {
@@ -137,6 +154,52 @@ export class Game {
       this.state = 'gameover';
     } else {
       this.player.kill();
+    }
+  }
+
+  // Detect entering a beam, and finalize the capture once the player has
+  // been pulled all the way into the boss.
+  handleCapture() {
+    const p = this.player;
+
+    if (p.captured && p.captor) {
+      const c = p.captor;
+      const ty = c.y + c.height / 2 + p.height / 2 + 2;
+      if (Math.hypot(p.x - c.x, p.y - ty) < 3) {
+        c.hasCaptive = true;
+        c.captureDone();
+        p.captured = false;
+        p.captor = null;
+        this.lives -= 1;
+        if (this.lives <= 0) {
+          p.alive = false;
+          this.state = 'gameover';
+        } else {
+          p.kill();
+        }
+      }
+      return;
+    }
+
+    if (!p.alive || p.dual || p.invuln > 0) return;
+    const captor = this.wave.enemies.find((e) => e.beamActive && !e.hasCaptive);
+    if (captor && captor.beamContains(p.x, p.y)) {
+      p.captured = true;
+      p.captor = captor;
+      captor.capturePhase = 'holding';
+    }
+  }
+
+  // A rescued fighter drifts down and docks with the player → dual fighter.
+  updateRescue(dt) {
+    if (!this.freed || !this.player.alive) return;
+    const f = this.freed;
+    const k = Math.min(1, 2.2 * dt);
+    f.x += (this.player.x - f.x) * k;
+    f.y += (this.player.y - f.y) * k;
+    if (Math.hypot(f.x - this.player.x, f.y - this.player.y) < 4) {
+      this.player.dual = true;
+      this.freed = null;
     }
   }
 
@@ -171,7 +234,7 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 4 - ENEMIES', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('PHASE 5 - CAPTURE', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {
@@ -179,6 +242,14 @@ export class Game {
     for (const b of this.enemyBullets) b.render(ctx);
     for (const b of this.playerBullets) b.render(ctx);
     for (const ex of this.explosions) ex.render(ctx);
+    if (this.freed) {
+      drawSprite(
+        ctx,
+        PLAYER_SPRITE,
+        Math.round(this.freed.x - PLAYER_SPRITE.width / 2),
+        Math.round(this.freed.y - PLAYER_SPRITE.height / 2)
+      );
+    }
     this.player.render(ctx);
     this.renderHud(ctx);
   }

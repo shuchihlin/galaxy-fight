@@ -8,6 +8,8 @@ const FLIGHT_GAP = 0.5; // extra pause between flights
 const FIRST_DELAY = 0.5; // pause before the first enemy enters
 const DIVE_INTERVAL = 1.8; // seconds between dive launches
 const MAX_DIVERS = 2; // concurrent attackers
+const CAPTURE_FIRST = 5; // delay before the first capture attempt
+const CAPTURE_INTERVAL = 10; // between capture attempts
 
 // Galaga-style layout: bosses anchor the center of the top row, flanked
 // by butterflies, with bees filling the bottom rows.
@@ -24,6 +26,7 @@ export class Wave {
     this.queue = [];
     this.timer = 0;
     this.diveTimer = DIVE_INTERVAL;
+    this.captureTimer = CAPTURE_FIRST;
     this.buildSchedule();
   }
 
@@ -67,6 +70,19 @@ export class Wave {
         formed[Math.floor(Math.random() * formed.length)].startDive(player);
       }
       this.diveTimer = DIVE_INTERVAL;
+    }
+
+    // Periodically send a boss to attempt a tractor-beam capture.
+    this.captureTimer -= dt;
+    const capturing = this.enemies.some((e) => e.state === 'capturing');
+    if (this.captureTimer <= 0 && this.queue.length === 0 && !capturing) {
+      const bosses = this.enemies.filter(
+        (e) => e.type === 'boss' && e.state === 'formation' && !e.hasCaptive
+      );
+      if (bosses.length > 0) {
+        bosses[Math.floor(Math.random() * bosses.length)].startCapture();
+      }
+      this.captureTimer = CAPTURE_INTERVAL;
     }
   }
 
