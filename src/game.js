@@ -4,9 +4,15 @@ import { input } from './core/input.js';
 import { Player } from './entities/player.js';
 import { Formation } from './formation.js';
 import { Wave } from './wave.js';
+import { Explosion } from './entities/explosion.js';
 
-// Top-level game object. State machine: title -> playing. Enemies and
-// collisions arrive in Phases 2-3 and hang off the playing state here.
+// Axis-aligned bounding-box overlap. Both args are { x, y, w, h } with
+// (x, y) the top-left corner.
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+// Top-level game object. State machine: title -> playing -> gameover.
 export class Game {
   constructor(ctx) {
     this.ctx = ctx;
@@ -18,7 +24,9 @@ export class Game {
 
   reset() {
     this.player = new Player();
-    this.bullets = [];
+    this.playerBullets = [];
+    this.enemyBullets = [];
+    this.explosions = [];
     this.formation = new Formation();
     this.wave = new Wave(this.formation);
     this.score = 0;
@@ -35,13 +43,95 @@ export class Game {
         this.state = 'playing';
       }
     } else if (this.state === 'playing') {
-      this.wave.update(dt);
-      this.player.update(dt, this.bullets);
-      for (const b of this.bullets) b.update(dt);
-      this.bullets = this.bullets.filter((b) => !b.dead);
+      this.updatePlaying(dt);
+    } else if (this.state === 'gameover') {
+      for (const ex of this.explosions) ex.update(dt);
+      this.explosions = this.explosions.filter((e) => !e.done);
+      if (input.wasPressed('start')) this.state = 'title';
     }
 
     input.clearFrame();
+  }
+
+  updatePlaying(dt) {
+    this.wave.update(dt, this.player, this.enemyBullets);
+    this.player.update(dt, this.playerBullets);
+
+    for (const b of this.playerBullets) b.update(dt);
+    for (const b of this.enemyBullets) b.update(dt);
+    for (const ex of this.explosions) ex.update(dt);
+
+    this.handleCollisions();
+
+    this.playerBullets = this.playerBullets.filter((b) => !b.dead);
+    this.enemyBullets = this.enemyBullets.filter((b) => !b.dead);
+    this.explosions = this.explosions.filter((e) => !e.done);
+
+    // Endless for now — a fresh wave forms once the screen is cleared.
+    // Real stage progression (and bonus stages) arrives in Phase 6.
+    if (this.wave.cleared) {
+      this.formation = new Formation();
+      this.wave = new Wave(this.formation);
+    }
+  }
+
+  handleCollisions() {
+    // Player shots vs enemies.
+    for (const b of this.playerBullets) {
+      if (b.dead) continue;
+      for (const e of this.wave.enemies) {
+        if (e.dead) continue;
+        if (aabb(b.getBounds(), e.getBounds())) {
+          b.dead = true;
+          e.dead = true;
+          this.score += e.points;
+          this.explosions.push(
+            new Explosion(e.x, e.y, e.type === 'butterfly' ? COLORS.accent : '#3b6cff')
+          );
+          break;
+        }
+      }
+    }
+
+    const vulnerable = this.player.alive && this.player.invuln <= 0;
+
+    // Enemy shots vs player.
+    if (vulnerable) {
+      for (const b of this.enemyBullets) {
+        if (b.dead) continue;
+        if (aabb(b.getBounds(), this.player.getBounds())) {
+          b.dead = true;
+          this.killPlayer();
+          break;
+        }
+      }
+    }
+
+    // Diving enemy bodies vs player.
+    if (vulnerable && this.player.alive) {
+      for (const e of this.wave.enemies) {
+        if (e.dead || e.state !== 'diving') continue;
+        if (aabb(e.getBounds(), this.player.getBounds())) {
+          e.dead = true;
+          this.explosions.push(new Explosion(e.x, e.y, '#3b6cff'));
+          this.killPlayer();
+          break;
+        }
+      }
+    }
+
+    this.wave.enemies = this.wave.enemies.filter((e) => !e.dead);
+  }
+
+  killPlayer() {
+    this.explosions.push(new Explosion(this.player.x, this.player.y, COLORS.player));
+    this.lives -= 1;
+    if (this.lives <= 0) {
+      this.player.alive = false;
+      this.state = 'gameover';
+    } else {
+      this.player.kill();
+    }
   }
 
   render() {
@@ -50,8 +140,12 @@ export class Game {
     ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
     this.starfield.render(ctx);
 
-    if (this.state === 'title') this.renderTitle(ctx);
-    else this.renderPlaying(ctx);
+    if (this.state === 'title') {
+      this.renderTitle(ctx);
+    } else {
+      this.renderPlaying(ctx);
+      if (this.state === 'gameover') this.renderGameOver(ctx);
+    }
   }
 
   renderTitle(ctx) {
@@ -71,14 +165,29 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 2 - FORMATION', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('PHASE 3 - COMBAT', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {
     this.wave.render(ctx);
-    for (const b of this.bullets) b.render(ctx);
+    for (const b of this.enemyBullets) b.render(ctx);
+    for (const b of this.playerBullets) b.render(ctx);
+    for (const ex of this.explosions) ex.render(ctx);
     this.player.render(ctx);
     this.renderHud(ctx);
+  }
+
+  renderGameOver(ctx) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COLORS.accent;
+    ctx.font = '14px "Press Start 2P", monospace';
+    ctx.fillText('GAME OVER', VIRTUAL_WIDTH / 2, 150);
+
+    if (Math.floor(this.elapsed * 2) % 2 === 0) {
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '7px "Press Start 2P", monospace';
+      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 178);
+    }
   }
 
   renderHud(ctx) {

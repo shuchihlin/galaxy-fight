@@ -1,11 +1,13 @@
 import { Enemy } from './entities/enemy.js';
 
-// Schedules and releases enemies into the formation. Enemies stream in
-// "flights" (one per row), alternating entry side, with a stagger so they
-// follow nose-to-tail down the same path before peeling into their slots.
+// Schedules and releases enemies into the formation, then periodically
+// sends formed-up enemies on dive attacks. Enemies stream in "flights"
+// (one per row), alternating entry side, staggered nose-to-tail.
 const FLIGHT_STAGGER = 0.18; // seconds between enemies in a flight
 const FLIGHT_GAP = 0.5; // extra pause between flights
 const FIRST_DELAY = 0.5; // pause before the first enemy enters
+const DIVE_INTERVAL = 1.8; // seconds between dive launches
+const MAX_DIVERS = 2; // concurrent attackers
 
 export class Wave {
   constructor(formation) {
@@ -13,6 +15,7 @@ export class Wave {
     this.enemies = [];
     this.queue = [];
     this.timer = 0;
+    this.diveTimer = DIVE_INTERVAL;
     this.buildSchedule();
   }
 
@@ -32,11 +35,11 @@ export class Wave {
     }
   }
 
-  get done() {
-    return this.queue.length === 0 && this.enemies.every((e) => e.state === 'formation');
+  get cleared() {
+    return this.queue.length === 0 && this.enemies.length === 0;
   }
 
-  update(dt) {
+  update(dt, player, enemyBullets) {
     this.timer += dt;
     this.formation.update(dt);
 
@@ -44,7 +47,20 @@ export class Wave {
       this.enemies.push(new Enemy(this.queue.shift(), this.formation));
     }
 
-    for (const e of this.enemies) e.update(dt);
+    for (const e of this.enemies) e.update(dt, player, enemyBullets);
+
+    // Once everyone has entered, periodically launch a dive attack.
+    this.diveTimer -= dt;
+    if (this.diveTimer <= 0 && this.queue.length === 0) {
+      const formed = this.enemies.filter((e) => e.state === 'formation');
+      const divers = this.enemies.filter(
+        (e) => e.state === 'diving' || e.state === 'returning'
+      );
+      if (formed.length > 0 && divers.length < MAX_DIVERS) {
+        formed[Math.floor(Math.random() * formed.length)].startDive(player);
+      }
+      this.diveTimer = DIVE_INTERVAL;
+    }
   }
 
   render(ctx) {
