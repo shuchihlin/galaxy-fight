@@ -12,7 +12,7 @@ import { drawSprite } from './sprite.js';
 import { audio } from './audio.js';
 import { loadScores, saveScore, highScore } from './highscores.js';
 
-const SPLASH_TIME = 2.0; // seconds the intro image shows before play
+const SPLASH_TIME = 2.5; // seconds the intro image shows before play
 
 // A Challenging Stage every 4th stage (3, 7, 11, ...), as in the arcade.
 function isChallenging(stage) {
