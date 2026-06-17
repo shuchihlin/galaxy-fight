@@ -4,10 +4,10 @@
 export function difficultyFor(stage) {
   const s = stage - 1;
   return {
-    diveInterval: Math.max(0.7, 1.8 - s * 0.1),
-    maxDivers: Math.min(5, 2 + Math.floor(s / 2)),
-    diveSpeed: 155 + s * 8,
-    fireInterval: Math.max(0.32, 0.6 - s * 0.025),
-    captureInterval: Math.max(6, 10 - s * 0.4),
+    diveInterval: Math.max(0.5, 1.4 - s * 0.1), // dive more often, sooner
+    maxDivers: Math.min(6, 3 + Math.floor(s / 2)), // more simultaneous attackers
+    diveSpeed: 170 + s * 9, // faster, harder-to-dodge dives
+    fireInterval: Math.max(0.25, 0.5 - s * 0.03), // enemies shoot more
+    captureInterval: Math.max(5, 9 - s * 0.4), // capture attempts a bit sooner
   };
 }
