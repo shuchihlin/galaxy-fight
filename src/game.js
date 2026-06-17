@@ -12,6 +12,12 @@ function aabb(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+function explosionColor(type) {
+  if (type === 'boss') return '#3be86b';
+  if (type === 'butterfly') return COLORS.accent;
+  return '#3b6cff';
+}
+
 // Top-level game object. State machine: title -> playing -> gameover.
 export class Game {
   constructor(ctx) {
@@ -83,11 +89,11 @@ export class Game {
         if (e.dead) continue;
         if (aabb(b.getBounds(), e.getBounds())) {
           b.dead = true;
-          e.dead = true;
-          this.score += e.points;
-          this.explosions.push(
-            new Explosion(e.x, e.y, e.type === 'butterfly' ? COLORS.accent : '#3b6cff')
-          );
+          const destroyed = e.hit();
+          if (destroyed) {
+            this.score += e.points;
+            this.explosions.push(new Explosion(e.x, e.y, explosionColor(e.type)));
+          }
           break;
         }
       }
@@ -113,7 +119,7 @@ export class Game {
         if (e.dead || e.state !== 'diving') continue;
         if (aabb(e.getBounds(), this.player.getBounds())) {
           e.dead = true;
-          this.explosions.push(new Explosion(e.x, e.y, '#3b6cff'));
+          this.explosions.push(new Explosion(e.x, e.y, explosionColor(e.type)));
           this.killPlayer();
           break;
         }
@@ -165,7 +171,7 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 3 - COMBAT', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('PHASE 4 - ENEMIES', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {

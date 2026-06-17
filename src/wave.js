@@ -9,6 +9,14 @@ const FIRST_DELAY = 0.5; // pause before the first enemy enters
 const DIVE_INTERVAL = 1.8; // seconds between dive launches
 const MAX_DIVERS = 2; // concurrent attackers
 
+// Galaga-style layout: bosses anchor the center of the top row, flanked
+// by butterflies, with bees filling the bottom rows.
+function typeFor(row, col) {
+  if (row === 0 && col >= 2 && col <= 5) return 'boss';
+  if (row <= 2) return 'butterfly';
+  return 'bee';
+}
+
 export class Wave {
   constructor(formation) {
     this.formation = formation;
@@ -25,11 +33,10 @@ export class Wave {
 
     for (let row = 0; row < rows; row++) {
       const side = row % 2 === 0 ? 'left' : 'right';
-      const type = row < 2 ? 'butterfly' : 'bee';
       if (row > 0) t += FLIGHT_GAP;
 
       for (let col = 0; col < cols; col++) {
-        this.queue.push({ row, col, side, type, releaseAt: t });
+        this.queue.push({ row, col, side, type: typeFor(row, col), releaseAt: t });
         t += FLIGHT_STAGGER;
       }
     }

@@ -1,6 +1,6 @@
 import { Path } from '../path.js';
 import { drawSprite } from '../sprite.js';
-import { BEE_SPRITE, BUTTERFLY_SPRITE } from '../sprites.js';
+import { BEE_SPRITE, BUTTERFLY_SPRITE, BOSS_SPRITE, BOSS_HIT_SPRITE } from '../sprites.js';
 import { EnemyBullet } from './bullet.js';
 import { VIRTUAL_WIDTH } from '../config.js';
 
@@ -33,10 +33,23 @@ export class Enemy {
     this.col = slot.col;
     this.type = slot.type;
     this.formation = formation;
-    this.sprite = this.type === 'butterfly' ? BUTTERFLY_SPRITE : BEE_SPRITE;
+
+    if (this.type === 'boss') {
+      this.sprite = BOSS_SPRITE;
+      this.hitSprite = BOSS_HIT_SPRITE;
+      this.health = 2;
+    } else if (this.type === 'butterfly') {
+      this.sprite = BUTTERFLY_SPRITE;
+      this.health = 1;
+    } else {
+      this.sprite = BEE_SPRITE;
+      this.health = 1;
+    }
+
     this.width = this.sprite.width;
     this.height = this.sprite.height;
     this.dead = false;
+    this.damaged = false;
     this.fireTimer = 0;
 
     const common = slot.side === 'left' ? LEFT_ENTRY : RIGHT_ENTRY;
@@ -114,9 +127,21 @@ export class Enemy {
     }
   }
 
+  // Apply one hit. Returns true if this destroyed the enemy, false if it
+  // only wounded it (a Boss Galaga survives its first hit and flashes).
+  hit() {
+    this.health -= 1;
+    if (this.health > 0) {
+      this.damaged = true;
+      return false;
+    }
+    this.dead = true;
+    return true;
+  }
+
   // Galaga-style scoring: worth double while diving.
   get points() {
-    const base = this.type === 'butterfly' ? 80 : 50;
+    const base = this.type === 'boss' ? 150 : this.type === 'butterfly' ? 80 : 50;
     return this.state === 'diving' ? base * 2 : base;
   }
 
@@ -127,9 +152,10 @@ export class Enemy {
   }
 
   render(ctx) {
+    const sprite = this.damaged && this.hitSprite ? this.hitSprite : this.sprite;
     drawSprite(
       ctx,
-      this.sprite,
+      sprite,
       Math.round(this.x - this.width / 2),
       Math.round(this.y - this.height / 2)
     );

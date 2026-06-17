@@ -72,3 +72,28 @@ export const BUTTERFLY_SPRITE = makeSprite(
   ],
   BUTTERFLY_PALETTE
 );
+
+// Boss Galaga: the larger, tougher enemy. Green by default; renders with
+// the "hit" palette (blue) after taking its first of two hits.
+const BOSS_MAP = [
+  '..G.......G..',
+  '...GG...GG...',
+  '....GGGGG....',
+  '...GWWWWWG...',
+  '..GGWWWWWGG..',
+  '.GGGGGGGGGGG.',
+  'GGGGGGGGGGGGG',
+  'GG.GGGGGGG.GG',
+  '.GG.GGGGG.GG.',
+  '..G..G.G..G..',
+];
+
+export const BOSS_SPRITE = makeSprite(BOSS_MAP, {
+  G: '#3be86b',
+  W: '#ffffff',
+});
+
+export const BOSS_HIT_SPRITE = makeSprite(BOSS_MAP, {
+  G: '#41a6ff',
+  W: '#ffffff',
+});
