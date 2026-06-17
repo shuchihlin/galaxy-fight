@@ -8,6 +8,8 @@ import { audio } from '../audio.js';
 const FIRE_COOLDOWN = 0.16;
 const RESPAWN_DELAY = 1.2;
 const RESPAWN_INVULN = 2.0;
+const MAX_BULLETS = 3; // bullets on screen for a single fighter
+const MAX_BULLETS_DUAL = 6; // dual fighter keeps double the cap
 
 export class Player {
   constructor() {
@@ -86,7 +88,7 @@ export class Player {
   }
 
   fire(bullets) {
-    const max = this.dual ? 4 : 2; // dual fighter doubles the bullet cap
+    const max = this.dual ? MAX_BULLETS_DUAL : MAX_BULLETS;
     if (bullets.length >= max) return;
 
     const ny = this.y - this.height / 2;
