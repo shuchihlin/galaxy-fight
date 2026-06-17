@@ -9,6 +9,7 @@ import {
 } from '../sprites.js';
 import { EnemyBullet } from './bullet.js';
 import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from '../config.js';
+import { audio } from '../audio.js';
 
 // Shared entry flight paths (in virtual-screen coords). Enemies enter
 // from the top corners, swoop down to mid-screen, loop, then peel off
@@ -108,6 +109,7 @@ export class Enemy {
     ]);
     this.dist = 0;
     this.fireTimer = 0.45;
+    audio.dive();
   }
 
   // A boss-only attack: dive to a hover point and deploy a tractor beam.
@@ -227,6 +229,7 @@ export class Enemy {
         this.capturePhase = 'beam';
         this.beamT = 0;
         this.holdTimer = 0;
+        audio.capture();
       }
     } else if (this.capturePhase === 'beam') {
       this.beamT = Math.min(1, this.beamT + dt / BEAM_GROW);

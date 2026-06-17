@@ -9,6 +9,7 @@ import { difficultyFor } from './difficulty.js';
 import { Explosion } from './entities/explosion.js';
 import { PLAYER_SPRITE } from './sprites.js';
 import { drawSprite } from './sprite.js';
+import { audio } from './audio.js';
 
 // A Challenging Stage every 4th stage (3, 7, 11, ...), as in the arcade.
 function isChallenging(stage) {
@@ -73,6 +74,14 @@ export class Game {
       this.wave = new Wave(this.formation, difficultyFor(this.stage));
     }
     this.phase = 'fighting';
+    audio.stageStart();
+  }
+
+  triggerGameOver() {
+    this.player.alive = false;
+    this.state = 'gameover';
+    audio.stopMusic();
+    audio.gameOver();
   }
 
   enterStageClear() {
@@ -91,10 +100,13 @@ export class Game {
     this.elapsed += dt;
     this.starfield.update(dt);
 
+    if (input.wasPressed('mute')) audio.toggleMute();
+
     if (this.state === 'title') {
       if (input.wasPressed('start') || input.wasPressed('fire')) {
         this.reset();
         this.state = 'playing';
+        audio.startMusic();
       }
     } else if (this.state === 'playing') {
       this.updatePlaying(dt);
@@ -158,9 +170,12 @@ export class Game {
           if (destroyed) {
             this.score += e.points;
             this.explosions.push(new Explosion(e.x, e.y, explosionColor(e.type)));
+            audio.explosion();
             if (this.challenge) this.stageHits += 1;
             // Destroying a boss that holds your ship frees it.
             if (e.hasCaptive && !this.player.dual) this.freed = { x: e.x, y: e.y };
+          } else {
+            audio.smallHit();
           }
           break;
         }
@@ -209,10 +224,10 @@ export class Game {
     }
 
     this.explosions.push(new Explosion(this.player.x, this.player.y, COLORS.player));
+    audio.explosion();
     this.lives -= 1;
     if (this.lives <= 0) {
-      this.player.alive = false;
-      this.state = 'gameover';
+      this.triggerGameOver();
     } else {
       this.player.kill();
     }
@@ -233,8 +248,7 @@ export class Game {
         p.captor = null;
         this.lives -= 1;
         if (this.lives <= 0) {
-          p.alive = false;
-          this.state = 'gameover';
+          this.triggerGameOver();
         } else {
           p.kill();
         }
@@ -261,6 +275,7 @@ export class Game {
     if (Math.hypot(f.x - this.player.x, f.y - this.player.y) < 4) {
       this.player.dual = true;
       this.freed = null;
+      audio.rescue();
     }
   }
 
@@ -295,7 +310,8 @@ export class Game {
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('PHASE 6 - STAGES', VIRTUAL_WIDTH / 2, 272);
+    ctx.fillText('M = MUTE', VIRTUAL_WIDTH / 2, 224);
+    ctx.fillText('PHASE 7 - AUDIO', VIRTUAL_WIDTH / 2, 272);
   }
 
   renderPlaying(ctx) {
@@ -374,5 +390,11 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.fillStyle = COLORS.dim;
     ctx.fillText('ST ' + this.stage, VIRTUAL_WIDTH / 2, 10);
+
+    if (audio.muted) {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = COLORS.dim;
+      ctx.fillText('MUTE', 4, VIRTUAL_HEIGHT - 4);
+    }
   }
 }

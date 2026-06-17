@@ -3,6 +3,7 @@ import { input } from '../core/input.js';
 import { drawSprite } from '../sprite.js';
 import { PLAYER_SPRITE } from '../sprites.js';
 import { Bullet } from './bullet.js';
+import { audio } from '../audio.js';
 
 const FIRE_COOLDOWN = 0.16;
 const RESPAWN_DELAY = 1.2;
@@ -86,6 +87,7 @@ export class Player {
     } else {
       bullets.push(new Bullet(this.x, ny));
     }
+    audio.shoot();
     this.cooldown = FIRE_COOLDOWN;
   }
 

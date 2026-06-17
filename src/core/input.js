@@ -13,6 +13,8 @@ const KEY_MAP = {
   D: 'right',
   ' ': 'fire',
   Enter: 'start',
+  m: 'mute',
+  M: 'mute',
 };
 
 export function setupInput() {
