@@ -1,6 +1,7 @@
-import { COLORS, VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from '../config.js';
+import { COLORS, VIRTUAL_WIDTH } from '../config.js';
+import { VIEW } from '../core/view.js';
 
-const BULLET_SPEED = 260; // px/sec, travels upward
+const BULLET_SPEED = 260; // design px/sec, travels upward (scaled by VIEW.ky)
 const BULLET_W = 2;
 const BULLET_H = 6;
 
@@ -15,7 +16,7 @@ export class Bullet {
   }
 
   update(dt) {
-    this.y -= BULLET_SPEED * dt;
+    this.y -= BULLET_SPEED * VIEW.ky * dt;
     if (this.y + BULLET_H < 0) this.dead = true;
   }
 
@@ -48,7 +49,7 @@ export class EnemyBullet {
   update(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    if (this.y > VIRTUAL_HEIGHT + 8 || this.x < -8 || this.x > VIRTUAL_WIDTH + 8) {
+    if (this.y > VIEW.h + 8 || this.x < -8 || this.x > VIRTUAL_WIDTH + 8) {
       this.dead = true;
     }
   }

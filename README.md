@@ -57,7 +57,7 @@ npm run preview  # serve the production build locally
 src/
 ├─ main.js          # entry: wires canvas, input, loop, game
 ├─ game.js          # state machine, collisions, scoring, stages
-├─ config.js        # virtual resolution, palette, tuning
+├─ config.js        # design resolution (224x288), palette, tuning
 ├─ difficulty.js    # per-stage difficulty curve
 ├─ formation.js     # the swaying enemy grid
 ├─ wave.js          # spawn schedule, dive & capture scheduling
@@ -69,7 +69,8 @@ src/
 ├─ audio.js         # Web Audio SFX + music
 ├─ highscores.js    # localStorage high-score table
 ├─ core/
-│  ├─ canvas.js     # aspect-preserving fractional fit scaling
+│  ├─ canvas.js     # backbuffer sizing + fit-to-safe-area scaling
+│  ├─ view.js       # live field size (224 x screen-aspect height), sy()
 │  ├─ input.js      # keyboard + pointer/touch
 │  └─ loop.js       # fixed-timestep game loop
 └─ entities/

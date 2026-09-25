@@ -8,12 +8,13 @@ import {
   PLAYER_SPRITE,
 } from '../sprites.js';
 import { EnemyBullet } from './bullet.js';
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT } from '../config.js';
+import { VIRTUAL_WIDTH } from '../config.js';
+import { VIEW, sy as scaleY } from '../core/view.js';
 import { audio } from '../audio.js';
 
-// Shared entry flight paths (in virtual-screen coords). Enemies enter
-// from the top corners, swoop down to mid-screen, loop, then peel off
-// toward their formation slot (appended as the final waypoint).
+// Shared entry flight paths (224x288 design coords; Y mapped via scaleY()).
+// Enemies enter from the top corners, swoop down to mid-screen, loop, then
+// peel off toward their formation slot (appended as the final waypoint).
 const LEFT_ENTRY = [
   { x: 30, y: -16 },
   { x: 70, y: 70 },
@@ -36,7 +37,7 @@ const DIVE_FIRE_INTERVAL = 0.6;
 const FLYTHROUGH_SPEED = 115; // px/sec during challenging-stage patterns
 
 // Capture (tractor-beam) tuning.
-const HOVER_Y = 150; // where the boss hovers to deploy the beam
+const HOVER_Y = 150; // design Y where the boss hovers to deploy the beam
 const BEAM_MAX_HALF = 26; // beam half-width at the bottom of the screen
 const BEAM_GROW = 0.4; // seconds to open / close the beam
 const BEAM_HOLD = 2.6; // seconds the beam stays open if it catches nothing
@@ -79,7 +80,7 @@ export class Enemy {
     if (formation) {
       const common = slot.side === 'left' ? LEFT_ENTRY : RIGHT_ENTRY;
       const home = formation.slotHome(this.row, this.col);
-      this.path = new Path([...common, home]);
+      this.path = new Path([...common.map((p) => ({ x: p.x, y: scaleY(p.y) })), home]);
       this.state = 'entering';
       const start = this.path.at(0);
       this.x = start.x;
@@ -102,10 +103,10 @@ export class Enemy {
     const dir = sx < VIRTUAL_WIDTH / 2 ? 1 : -1;
     this.path = new Path([
       { x: sx, y: sy },
-      { x: sx + dir * 28, y: sy + 44 },
-      { x: px, y: 172 },
-      { x: px - dir * 40, y: 232 },
-      { x: px + dir * 16, y: 330 },
+      { x: sx + dir * 28, y: sy + scaleY(44) },
+      { x: px, y: scaleY(172) },
+      { x: px - dir * 40, y: scaleY(232) },
+      { x: px + dir * 16, y: scaleY(330) },
     ]);
     this.dist = 0;
     this.fireTimer = 0.45;
@@ -121,8 +122,8 @@ export class Enemy {
     const dir = sx < VIRTUAL_WIDTH / 2 ? 1 : -1;
     this.path = new Path([
       { x: sx, y: sy },
-      { x: sx + dir * 24, y: sy + 50 },
-      { x: VIRTUAL_WIDTH / 2, y: HOVER_Y },
+      { x: sx + dir * 24, y: sy + scaleY(50) },
+      { x: VIRTUAL_WIDTH / 2, y: scaleY(HOVER_Y) },
     ]);
     this.dist = 0;
     this.beamT = 0;
@@ -165,8 +166,8 @@ export class Enemy {
 
   beamHalfWidthAt(y) {
     const apexY = this.y + this.height / 2;
-    if (y < apexY || y > VIRTUAL_HEIGHT) return 0;
-    const frac = (y - apexY) / (VIRTUAL_HEIGHT - apexY);
+    if (y < apexY || y > VIEW.h) return 0;
+    const frac = (y - apexY) / (VIEW.h - apexY);
     return BEAM_MAX_HALF * frac;
   }
 
@@ -183,7 +184,7 @@ export class Enemy {
     }
 
     if (this.state === 'entering' || this.state === 'returning') {
-      this.dist += ENTRY_SPEED * dt;
+      this.dist += ENTRY_SPEED * this.path.speedK * dt;
       const p = this.path.at(this.dist);
       this.x = p.x;
       this.y = p.y;
@@ -194,24 +195,26 @@ export class Enemy {
       this.x += (target.x - this.x) * k;
       this.y += (target.y - this.y) * k;
     } else if (this.state === 'diving') {
-      this.dist += this.diveSpeed * dt;
+      this.dist += this.diveSpeed * this.path.speedK * dt;
       const p = this.path.at(this.dist);
       this.x = p.x;
       this.y = p.y;
 
       this.fireTimer -= dt;
-      if (this.fireTimer <= 0 && this.y > 40 && this.y < 236 && player && player.alive && enemyBullets) {
+      if (this.fireTimer <= 0 && this.y > scaleY(40) && this.y < scaleY(236) && player && player.alive && enemyBullets) {
         const dx = player.x - this.x;
         const dy = player.y - this.y;
         const len = Math.hypot(dx, dy) || 1;
-        const sp = 150;
+        // 150 design px/s; scale so time-to-target matches the 288 field.
+        const designLen = Math.hypot(dx, dy / VIEW.ky) || 1;
+        const sp = (150 * len) / designLen;
         enemyBullets.push(new EnemyBullet(this.x, this.y, (dx / len) * sp, (dy / len) * sp));
         this.fireTimer = this.fireInterval;
       }
 
       if (this.dist >= this.path.length) this.startReturn();
     } else if (this.state === 'flythrough') {
-      this.dist += FLYTHROUGH_SPEED * dt;
+      this.dist += FLYTHROUGH_SPEED * this.path.speedK * dt;
       const p = this.path.at(this.dist);
       this.x = p.x;
       this.y = p.y;
@@ -221,7 +224,7 @@ export class Enemy {
 
   updateCapture(dt) {
     if (this.capturePhase === 'dive') {
-      this.dist += DIVE_SPEED * dt;
+      this.dist += DIVE_SPEED * this.path.speedK * dt;
       const p = this.path.at(this.dist);
       this.x = p.x;
       this.y = p.y;
@@ -294,7 +297,7 @@ export class Enemy {
 
   renderBeam(ctx) {
     const apexY = this.y + this.height / 2;
-    const span = VIRTUAL_HEIGHT - apexY;
+    const span = VIEW.h - apexY;
     const half = BEAM_MAX_HALF * this.beamT;
 
     ctx.save();
@@ -303,8 +306,8 @@ export class Enemy {
     ctx.fillStyle = '#7a4dff';
     ctx.beginPath();
     ctx.moveTo(this.x, apexY);
-    ctx.lineTo(this.x - half, VIRTUAL_HEIGHT);
-    ctx.lineTo(this.x + half, VIRTUAL_HEIGHT);
+    ctx.lineTo(this.x - half, VIEW.h);
+    ctx.lineTo(this.x + half, VIEW.h);
     ctx.closePath();
     ctx.fill();
 

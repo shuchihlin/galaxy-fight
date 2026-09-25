@@ -3,6 +3,8 @@
 // cumulative arc-lengths, so enemies can travel it at a constant speed
 // (move by distance, not by curve parameter).
 
+import { VIEW } from './core/view.js';
+
 function catmull(p0, p1, p2, p3, t) {
   const t2 = t * t;
   const t3 = t2 * t;
@@ -44,6 +46,16 @@ export class Path {
       this.cum.push(this.cum[i - 1] + Math.hypot(dx, dy));
     }
     this.length = this.cum[this.cum.length - 1];
+
+    // speedK: ratio of this path's length to the same path in the original
+    // 288-tall design space (y / ky). Multiplying a design speed by speedK
+    // keeps the time to fly the path identical on a taller field.
+    let designLen = 0;
+    const ky = VIEW.ky;
+    for (let i = 1; i < pts.length; i++) {
+      designLen += Math.hypot(pts[i].x - pts[i - 1].x, (pts[i].y - pts[i - 1].y) / ky);
+    }
+    this.speedK = designLen > 0 ? this.length / designLen : 1;
   }
 
   // Position at a given distance travelled along the path.

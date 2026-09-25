@@ -1,10 +1,11 @@
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, COLORS } from './config.js';
+import { VIRTUAL_WIDTH, COLORS } from './config.js';
+import { VIEW } from './core/view.js';
 
 // A simple multi-layer scrolling starfield for the background.
 export class Starfield {
   constructor(count = 70) {
     this.stars = Array.from({ length: count }, () =>
-      this.makeStar(Math.random() * VIRTUAL_HEIGHT)
+      this.makeStar(Math.random() * VIEW.h)
     );
   }
 
@@ -22,7 +23,7 @@ export class Starfield {
   update(dt) {
     for (const s of this.stars) {
       s.y += s.speed * dt;
-      if (s.y > VIRTUAL_HEIGHT) {
+      if (s.y > VIEW.h) {
         Object.assign(s, this.makeStar(0));
       }
     }
