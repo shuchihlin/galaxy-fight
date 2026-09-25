@@ -69,7 +69,7 @@ src/
 ├─ audio.js         # Web Audio SFX + music
 ├─ highscores.js    # localStorage high-score table
 ├─ core/
-│  ├─ canvas.js     # crisp integer/fractional scaling
+│  ├─ canvas.js     # aspect-preserving fractional fit scaling
 │  ├─ input.js      # keyboard + pointer/touch
 │  └─ loop.js       # fixed-timestep game loop
 └─ entities/

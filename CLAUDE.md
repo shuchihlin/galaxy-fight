@@ -25,7 +25,7 @@ URLs. Vercel auto-detects Vite (build `vite build`, output `dist`).
 A fixed-timestep loop (`src/core/loop.js`) drives `Game` (`src/game.js`), a
 state machine: **title → splash → playing → gameover**, where `playing` has
 sub-phases **intro → fighting → clear**. Internal resolution is a portrait
-224×288, integer-scaled to fit (`src/core/canvas.js`). Pixel-art sprites are
+224×288, scaled (fractional, aspect-preserving) to fit (`src/core/canvas.js`). Pixel-art sprites are
 row-string + palette maps (`src/sprite.js`, `src/sprites.js`). Enemies follow
 Catmull-Rom spline flight paths (`src/path.js`). See `README.md` for the full
 file-by-file map.
