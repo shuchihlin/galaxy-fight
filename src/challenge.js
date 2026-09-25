@@ -1,5 +1,6 @@
 import { Enemy } from './entities/enemy.js';
 import { Path } from './path.js';
+import { sy } from './core/view.js';
 
 // A Challenging Stage: enemies fly through in form-up patterns and never
 // shoot or settle. You score by hitting them; clearing them all earns a
@@ -64,7 +65,7 @@ export class ChallengingWave {
     while (this.queue.length && this.queue[0].releaseAt <= this.timer) {
       const q = this.queue.shift();
       const e = new Enemy({ type: q.type }, null, {});
-      e.startFlythrough(new Path(q.tmpl));
+      e.startFlythrough(new Path(q.tmpl.map((p) => ({ x: p.x, y: sy(p.y) }))));
       this.enemies.push(e);
     }
     for (const e of this.enemies) e.update(dt);

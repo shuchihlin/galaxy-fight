@@ -1,5 +1,7 @@
 // Virtual (internal) resolution. Galaga's arcade screen is a portrait
-// 224x288 display — we render to that and scale up with crisp pixels.
+// 224x288 display. These are the *design* dimensions: gameplay constants
+// are authored in this space. The live field height adapts to the screen
+// (see core/view.js); width is always 224.
 export const VIRTUAL_WIDTH = 224;
 export const VIRTUAL_HEIGHT = 288;
 

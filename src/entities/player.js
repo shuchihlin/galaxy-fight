@@ -1,4 +1,5 @@
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, PLAYER } from '../config.js';
+import { VIRTUAL_WIDTH, PLAYER } from '../config.js';
+import { VIEW } from '../core/view.js';
 import { input, pointer } from '../core/input.js';
 import { drawSprite } from '../sprite.js';
 import { PLAYER_SPRITE } from '../sprites.js';
@@ -15,7 +16,7 @@ export class Player {
   constructor() {
     this.width = PLAYER_SPRITE.width;
     this.height = PLAYER_SPRITE.height;
-    this.baseY = VIRTUAL_HEIGHT - 22; // the ship's home line at the bottom
+    this.baseY = VIEW.h - 22; // the ship's home line at the bottom
     this.x = VIRTUAL_WIDTH / 2;
     this.y = this.baseY;
     this.cooldown = 0;

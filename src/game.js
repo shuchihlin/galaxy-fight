@@ -1,4 +1,5 @@
-import { VIRTUAL_WIDTH, VIRTUAL_HEIGHT, COLORS } from './config.js';
+import { VIRTUAL_WIDTH, COLORS } from './config.js';
+import { VIEW, sy, applyPendingView } from './core/view.js';
 import { Starfield } from './starfield.js';
 import { input, pointer } from './core/input.js';
 import { Player } from './entities/player.js';
@@ -113,6 +114,8 @@ export class Game {
 
   update(dt) {
     this.elapsed += dt;
+    // Adopt a new field height (screen resized/rotated) only between games.
+    if (this.state === 'title' || this.state === 'splash') applyPendingView();
     this.starfield.update(dt);
 
     if (input.wasPressed('mute')) audio.toggleMute();
@@ -307,7 +310,7 @@ export class Game {
   render() {
     const ctx = this.ctx;
     ctx.fillStyle = COLORS.bg;
-    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIEW.h);
     this.starfield.render(ctx);
 
     if (this.state === 'title') {
@@ -338,20 +341,20 @@ export class Game {
 
     ctx.fillStyle = COLORS.player;
     ctx.font = '20px "Press Start 2P", monospace';
-    ctx.fillText('GALAXY', VIRTUAL_WIDTH / 2, 104);
+    ctx.fillText('GALAXY', VIRTUAL_WIDTH / 2, sy(104));
     ctx.fillStyle = COLORS.accent;
-    ctx.fillText('FIGHT', VIRTUAL_WIDTH / 2, 132);
+    ctx.fillText('FIGHT', VIRTUAL_WIDTH / 2, sy(132));
 
     if (Math.floor(this.elapsed * 2) % 2 === 0) {
       ctx.fillStyle = COLORS.white;
       ctx.font = '8px "Press Start 2P", monospace';
-      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 168);
+      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, sy(168));
     }
 
     // High-score table.
     ctx.fillStyle = '#ffd23f';
     ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('HIGH SCORES', VIRTUAL_WIDTH / 2, 192);
+    ctx.fillText('HIGH SCORES', VIRTUAL_WIDTH / 2, sy(192));
     ctx.fillStyle = COLORS.white;
     ctx.font = '6px "Press Start 2P", monospace';
     const scores = this.highScores.length ? this.highScores : [0];
@@ -359,24 +362,24 @@ export class Game {
       ctx.fillText(
         i + 1 + '   ' + String(s).padStart(6, '0'),
         VIRTUAL_WIDTH / 2,
-        206 + i * 9
+        sy(206) + i * 9
       );
     });
 
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('M MUTE   P PAUSE', VIRTUAL_WIDTH / 2, 264);
-    ctx.fillText('PHASE 8 - POLISH', VIRTUAL_WIDTH / 2, 278);
+    ctx.fillText('M MUTE   P PAUSE', VIRTUAL_WIDTH / 2, sy(264));
+    ctx.fillText('PHASE 8 - POLISH', VIRTUAL_WIDTH / 2, sy(278));
   }
 
   renderPaused(ctx) {
     ctx.textAlign = 'center';
     ctx.fillStyle = COLORS.white;
     ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillText('PAUSED', VIRTUAL_WIDTH / 2, 144);
+    ctx.fillText('PAUSED', VIRTUAL_WIDTH / 2, sy(144));
     ctx.fillStyle = COLORS.dim;
     ctx.font = '6px "Press Start 2P", monospace';
-    ctx.fillText('P TO RESUME', VIRTUAL_WIDTH / 2, 164);
+    ctx.fillText('P TO RESUME', VIRTUAL_WIDTH / 2, sy(164));
   }
 
   renderPlaying(ctx) {
@@ -404,12 +407,12 @@ export class Game {
     if (this.challenge) {
       ctx.fillStyle = '#ffd23f';
       ctx.font = '11px "Press Start 2P", monospace';
-      ctx.fillText('CHALLENGING', VIRTUAL_WIDTH / 2, 134);
-      ctx.fillText('STAGE', VIRTUAL_WIDTH / 2, 152);
+      ctx.fillText('CHALLENGING', VIRTUAL_WIDTH / 2, sy(134));
+      ctx.fillText('STAGE', VIRTUAL_WIDTH / 2, sy(152));
     } else {
       ctx.fillStyle = COLORS.player;
       ctx.font = '14px "Press Start 2P", monospace';
-      ctx.fillText('STAGE ' + this.stage, VIRTUAL_WIDTH / 2, 144);
+      ctx.fillText('STAGE ' + this.stage, VIRTUAL_WIDTH / 2, sy(144));
     }
   }
 
@@ -418,14 +421,14 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#ffd23f';
     ctx.font = '8px "Press Start 2P", monospace';
-    ctx.fillText('HITS ' + this.stageHits + '/' + this.stageTotal, VIRTUAL_WIDTH / 2, 132);
+    ctx.fillText('HITS ' + this.stageHits + '/' + this.stageTotal, VIRTUAL_WIDTH / 2, sy(132));
 
     const perfect = this.stageTotal > 0 && this.stageHits === this.stageTotal;
     ctx.fillStyle = COLORS.white;
     ctx.fillText(
       perfect ? 'PERFECT! 10000' : 'BONUS ' + this.stageHits * 100,
       VIRTUAL_WIDTH / 2,
-      152
+      sy(152)
     );
   }
 
@@ -433,24 +436,24 @@ export class Game {
     ctx.textAlign = 'center';
     ctx.fillStyle = COLORS.accent;
     ctx.font = '14px "Press Start 2P", monospace';
-    ctx.fillText('GAME OVER', VIRTUAL_WIDTH / 2, 132);
+    ctx.fillText('GAME OVER', VIRTUAL_WIDTH / 2, sy(132));
 
     ctx.fillStyle = COLORS.white;
     ctx.font = '7px "Press Start 2P", monospace';
-    ctx.fillText('SCORE ' + String(this.score).padStart(6, '0'), VIRTUAL_WIDTH / 2, 158);
+    ctx.fillText('SCORE ' + String(this.score).padStart(6, '0'), VIRTUAL_WIDTH / 2, sy(158));
 
     if (this.newRecord) {
       ctx.fillStyle = '#ffd23f';
-      ctx.fillText('NEW RECORD!', VIRTUAL_WIDTH / 2, 174);
+      ctx.fillText('NEW RECORD!', VIRTUAL_WIDTH / 2, sy(174));
     } else {
       ctx.fillStyle = COLORS.dim;
-      ctx.fillText('HI ' + String(highScore()).padStart(6, '0'), VIRTUAL_WIDTH / 2, 174);
+      ctx.fillText('HI ' + String(highScore()).padStart(6, '0'), VIRTUAL_WIDTH / 2, sy(174));
     }
 
     if (Math.floor(this.elapsed * 2) % 2 === 0) {
       ctx.fillStyle = COLORS.white;
       ctx.font = '7px "Press Start 2P", monospace';
-      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, 200);
+      ctx.fillText('PRESS ENTER', VIRTUAL_WIDTH / 2, sy(200));
     }
   }
 
@@ -474,10 +477,10 @@ export class Game {
     // Bottom corners: stage indicator + mute state.
     ctx.fillStyle = COLORS.dim;
     ctx.textAlign = 'left';
-    ctx.fillText('ST ' + this.stage, 4, VIRTUAL_HEIGHT - 4);
+    ctx.fillText('ST ' + this.stage, 4, VIEW.h - 4);
     if (audio.muted) {
       ctx.textAlign = 'right';
-      ctx.fillText('MUTE', VIRTUAL_WIDTH - 4, VIRTUAL_HEIGHT - 4);
+      ctx.fillText('MUTE', VIRTUAL_WIDTH - 4, VIEW.h - 4);
     }
   }
 }

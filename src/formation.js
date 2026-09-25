@@ -1,4 +1,5 @@
 import { VIRTUAL_WIDTH } from './config.js';
+import { sy } from './core/view.js';
 
 // The enemy formation grid near the top of the screen. The whole grid
 // sways gently side to side ("breathing"), and enemies lock to their
@@ -8,8 +9,9 @@ export class Formation {
     this.cols = 8;
     this.rows = 5;
     this.cellW = 20;
-    this.cellH = 18;
-    this.topY = 44;
+    // Vertical layout scales with the field height (design: 18 / 44).
+    this.cellH = sy(18);
+    this.topY = sy(44);
 
     this.sway = 0;
     this.swayAmp = 10;
